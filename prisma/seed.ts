@@ -9,12 +9,11 @@ function startOfToday() {
 async function main() {
   const today = startOfToday();
 
-  // idempotent seed: if exists, do nothing
   const existing = await prisma.dailyGame.findUnique({
     where: { date: today },
   });
   if (existing) {
-    console.log("Seed skipped: today already exists.");
+    console.log("Seed skipped: today's game already exists.");
     return;
   }
 
@@ -24,7 +23,6 @@ async function main() {
       theme: "Tech Giants",
       objects: {
         create: [
-          // NOTE: numbers are illustrative for MVP (not factual).
           {
             name: "Apple",
             oldest: 1976,
