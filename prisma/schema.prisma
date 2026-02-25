@@ -1,0 +1,34 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model DailyGame {
+  id        String      @id @default(cuid())
+  date      DateTime    @unique
+  theme     String
+  createdAt DateTime    @default(now())
+
+  objects   GameObject[]
+}
+
+model GameObject {
+  id         String    @id @default(cuid())
+  name       String
+
+  // metrics (numbers). We keep them as Int to simplify.
+  oldest     Int
+  largest    Int
+  value      Int
+  influence  Int
+  extreme    Int
+
+  dailyGame   DailyGame @relation(fields: [dailyGameId], references: [id], onDelete: Cascade)
+  dailyGameId String
+
+  @@index([dailyGameId])
+}
