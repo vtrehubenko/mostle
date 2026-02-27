@@ -21,6 +21,8 @@ async function main() {
     data: {
       date: today,
       theme: "Tech Giants",
+      specialLabel: "Employees",
+      specialHint: "Company with the most employees",
       objects: {
         create: [
           {
@@ -29,7 +31,7 @@ async function main() {
             largest: 220,
             value: 3000,
             influence: 95,
-            extreme: 1,
+            specialValue: 164000,
           },
           {
             name: "Microsoft",
@@ -37,7 +39,7 @@ async function main() {
             largest: 230,
             value: 2800,
             influence: 92,
-            extreme: 2,
+            specialValue: 221000,
           },
           {
             name: "Google",
@@ -45,7 +47,7 @@ async function main() {
             largest: 180,
             value: 1900,
             influence: 98,
-            extreme: 3,
+            specialValue: 190000,
           },
           {
             name: "Amazon",
@@ -53,7 +55,7 @@ async function main() {
             largest: 200,
             value: 1600,
             influence: 90,
-            extreme: 4,
+            specialValue: 1500000,
           },
           {
             name: "Meta",
@@ -61,7 +63,7 @@ async function main() {
             largest: 120,
             value: 900,
             influence: 88,
-            extreme: 5,
+            specialValue: 67000,
           },
         ],
       },

@@ -8,12 +8,14 @@ datasource db {
 }
 
 model DailyGame {
-  id        String      @id @default(cuid())
-  date      DateTime    @unique
-  theme     String
-  createdAt DateTime    @default(now())
+  id            String   @id @default(cuid())
+  date          DateTime @unique
+  theme         String
+  specialLabel  String
+  specialHint   String
+  createdAt     DateTime @default(now())
 
-  objects   GameObject[]
+  objects       GameObject[]
 }
 
 model GameObject {
@@ -25,7 +27,7 @@ model GameObject {
   largest    Int
   value      Int
   influence  Int
-  extreme    Int
+  specialValue Int
 
   dailyGame   DailyGame @relation(fields: [dailyGameId], references: [id], onDelete: Cascade)
   dailyGameId String

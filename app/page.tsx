@@ -1,26 +1,16 @@
-export const dynamic = "force-dynamic";
+import DailyGame from "@/components/DailyGame";
 
-async function getDaily() {
-  const res = await fetch(
-    `${process.env.NEXT_PUBLIC_BASE_URL ?? ""}/api/daily`,
-    {
-      cache: "no-store",
-    },
-  );
-  return res.json();
-}
-
-export default async function Home() {
+export default function Home() {
   return (
-    <main style={{ padding: 24, fontFamily: "system-ui" }}>
-      <h1 style={{ fontSize: 28, fontWeight: 700 }}>Mostle</h1>
-      <p style={{ marginTop: 8, opacity: 0.8 }}>
-        Next step: show today’s game from DB.
-      </p>
-      <p style={{ marginTop: 16 }}>
-        Сейчас сделаем UI через client fetch (чтобы работало и локально, и на
-        Vercel).
-      </p>
+    <main className="h-screen bg-neutral-100 flex flex-col">
+      <header className="mx-auto max-w-5xl px-4 pt-10">
+        <h1 className="text-3xl font-bold tracking-tight">Mostle</h1>
+        <p className="mt-2 text-neutral-600">
+          A daily ranking puzzle: five objects, five metrics.
+        </p>
+      </header>
+
+      <DailyGame />
     </main>
   );
 }
