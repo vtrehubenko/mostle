@@ -4,16 +4,18 @@ import { useEffect, useMemo, useState } from "react";
 import type { DailyGameDTO, MetricKey } from "@/types/game";
 import { metricsForGame } from "@/types/game";
 import type { CSSProperties } from "react";
+import { snapCenterToCursor } from "@dnd-kit/modifiers";
 
 import {
   DndContext,
-  DragEndEvent,
+  type DragEndEvent,
   DragOverlay,
   useDraggable,
   useDroppable,
   PointerSensor,
   useSensor,
   useSensors,
+  type Modifier,
 } from "@dnd-kit/core";
 
 type LoadState =
@@ -38,18 +40,27 @@ function DraggableCard({
   title,
   subtitle,
   isSelected,
+  disabled,
+  variant = "full",
 }: {
   id: string;
   title: string;
   subtitle?: string;
   isSelected?: boolean;
+  disabled?: boolean;
+  variant?: "full" | "pill";
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
-    useDraggable({ id });
+    useDraggable({ id, disabled });
 
   const style: CSSProperties | undefined = transform
     ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
     : undefined;
+
+  const base = "rounded-xl border text-left transition bg-white";
+  const full = "w-full p-3";
+  const pill = "inline-flex w-fit max-w-[220px] items-center px-3 py-2";
+  const hover = isSelected ? "border-neutral-900" : "hover:bg-neutral-50";
 
   return (
     <div
@@ -57,12 +68,27 @@ function DraggableCard({
       style={style}
       className={[
         "rounded-xl border p-3 text-left transition bg-white",
+        "select-none cursor-grab active:cursor-grabbing touch-none",
         isSelected ? "border-neutral-900" : "hover:bg-neutral-50",
-        isDragging ? "opacity-50" : "",
+        disabled ? "opacity-40" : "",
+        isDragging ? "opacity-0" : "",
       ].join(" ")}
-      {...listeners}
+      {...(!disabled ? listeners : {})}
       {...attributes}
     >
+      <div className="min-w-0">
+        <div className="truncate font-medium">{title}</div>
+        {subtitle && variant === "full" && (
+          <div className="mt-1 text-xs text-neutral-500">{subtitle}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StaticCard({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <div className="rounded-xl border p-3 text-left bg-white opacity-40">
       <div className="font-medium">{title}</div>
       {subtitle && (
         <div className="mt-1 text-xs text-neutral-500">{subtitle}</div>
@@ -72,32 +98,54 @@ function DraggableCard({
 }
 
 function DroppableSlot({
-  id,
   title,
   hint,
-  children,
+  placed,
   isOver,
+  checkMark,
 }: {
-  id: string;
   title: string;
   hint: string;
-  children?: React.ReactNode;
+  placed?: React.ReactNode;
   isOver: boolean;
+  checkMark?: boolean | null;
 }) {
+  const isChecked = checkMark === true || checkMark === false;
+
+  const baseBorder =
+    checkMark === true
+      ? "border-green-500 ring-2 ring-green-200"
+      : checkMark === false
+        ? "border-red-500 ring-2 ring-red-200"
+        : "border-neutral-200";
+
+  // ВАЖНО: когда есть результат проверки, НЕ перебиваем рамку hover/over
+  const overStyle =
+    !isChecked && isOver ? "bg-neutral-50 border-neutral-900" : "bg-white";
+
   return (
     <div
       className={[
-        "w-full rounded-xl border p-3 text-left transition",
-        isOver ? "bg-neutral-50 border-neutral-900" : "bg-white",
+        "w-full rounded-xl border p-4 transition",
+        baseBorder,
+        overStyle,
       ].join(" ")}
     >
-      <div className="font-semibold">{title}</div>
-      <div className="mt-1 text-xs text-neutral-500">{hint}</div>
-      <div className="mt-3">{children}</div>
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <div className="font-semibold">{title}</div>
+          <div className="mt-1 text-xs text-neutral-500">{hint}</div>
+        </div>
+
+        <div className="shrink-0">
+          {placed ?? (
+            <span className="text-sm text-neutral-400">Drop here</span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
-
 function DroppableWrapper({
   droppableId,
   children,
@@ -111,10 +159,16 @@ function DroppableWrapper({
 
 export default function DailyGame() {
   const [state, setState] = useState<LoadState>({ status: "loading" });
-
   const [assignment, setAssignment] = useState<Assignment>(EMPTY_ASSIGNMENT);
 
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(
+    null,
+  );
+  const [activeRect, setActiveRect] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
 
   const [checkState, setCheckState] = useState<
     | { status: "idle" }
@@ -155,16 +209,6 @@ export default function DailyGame() {
   const game = state.status === "success" ? state.data : null;
   const metrics = useMemo(() => (game ? metricsForGame(game) : []), [game]);
 
-  const poolObjects = useMemo(() => {
-    if (!game) return [];
-    const used = new Set<string>();
-    (Object.keys(assignment) as MetricKey[]).forEach((k) => {
-      const v = assignment[k];
-      if (v) used.add(v);
-    });
-    return game.objects.filter((o) => !used.has(o.id));
-  }, [game, assignment]);
-
   function labelForObject(id: string) {
     if (!game) return "";
     return game.objects.find((o) => o.id === id)?.name ?? "";
@@ -200,6 +244,7 @@ export default function DailyGame() {
         allCorrect: boolean;
         result: Array<{ key: MetricKey; isCorrect: boolean }>;
       };
+      console.log("CHECK RESULT:", data);
       setCheckState({
         status: "done",
         allCorrect: data.allCorrect,
@@ -211,52 +256,39 @@ export default function DailyGame() {
     }
   }
 
-  function handleDragStart(id: string) {
-    setActiveId(id);
-  }
-
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
+
     setActiveId(null);
+    setDragOffset(null);
+    setActiveRect(null);
 
     if (!over) return;
 
     const objectId = String(active.id);
     const overId = String(over.id);
 
-    // Drop to pool (unassign)
     if (overId === DROPPABLE_POOL_ID) {
       const fromSlot = findSlotByObjectId(objectId);
       if (!fromSlot) return;
-
       setAssignment((prev) => ({ ...prev, [fromSlot]: null }));
       setCheckState({ status: "idle" });
       return;
     }
 
-    // Drop to a slot
     const slot = overId as MetricKey;
 
     setAssignment((prev) => {
       const next: Assignment = { ...prev };
 
       const fromSlot = findSlotByObjectId(objectId);
-
-      // If dragged from some slot -> clear it first
       if (fromSlot) next[fromSlot] = null;
 
       const existingInTarget = next[slot];
-
-      // Put in target
       next[slot] = objectId;
 
-      // Swap: if target was occupied, move that item back to fromSlot (if existed), else drop to pool
-      if (existingInTarget) {
-        if (fromSlot) {
-          next[fromSlot] = existingInTarget;
-        } else {
-          // was from pool -> existing item goes to pool (i.e., unassigned)
-        }
+      if (existingInTarget && fromSlot) {
+        next[fromSlot] = existingInTarget;
       }
 
       return next;
@@ -264,6 +296,15 @@ export default function DailyGame() {
 
     setCheckState({ status: "idle" });
   }
+
+  const snapToPointer: Modifier = ({ transform }) => {
+    if (!dragOffset) return transform;
+    return {
+      ...transform,
+      x: transform.x - dragOffset.x,
+      y: transform.y - dragOffset.y,
+    };
+  };
 
   if (state.status === "loading") {
     return (
@@ -307,16 +348,42 @@ export default function DailyGame() {
 
       <DndContext
         sensors={sensors}
-        onDragStart={(e) => handleDragStart(String(e.active.id))}
+        onDragStart={(e) => {
+          const id = String(e.active.id);
+          setActiveId(id);
+
+          const p = e.activatorEvent as PointerEvent;
+          const rect = e.active.rect.current.initial;
+
+          if (rect) {
+            setActiveRect({ width: rect.width, height: rect.height });
+          } else {
+            setActiveRect(null);
+          }
+
+          if (p && rect) {
+            setDragOffset({
+              x: p.clientX - rect.left,
+              y: p.clientY - rect.top,
+            });
+          } else {
+            setDragOffset(null);
+          }
+        }}
         onDragEnd={handleDragEnd}
+        onDragCancel={() => {
+          setActiveId(null);
+          setDragOffset(null);
+          setActiveRect(null);
+        }}
       >
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
-          {/* LEFT: pool (objects) */}
+        <div className="mt-6 grid gap-4 md:grid-cols-2 items-stretch">
+          {/* LEFT: Objects */}
           <DroppableWrapper droppableId={DROPPABLE_POOL_ID}>
             {({ isOver }) => (
               <div
                 className={[
-                  "rounded-2xl border bg-white p-5 shadow-sm transition",
+                  "rounded-2xl border bg-white p-5 shadow-sm transition flex flex-col",
                   isOver ? "border-neutral-900 bg-neutral-50" : "",
                 ].join(" ")}
               >
@@ -326,19 +393,24 @@ export default function DailyGame() {
                 </p>
 
                 <div className="mt-3 grid gap-2">
-                  {poolObjects.map((o) => (
-                    <DraggableCard
-                      key={o.id}
-                      id={o.id}
-                      title={o.name}
-                      subtitle="Drag me"
-                    />
-                  ))}
-                  {poolObjects.length === 0 && (
-                    <div className="text-sm text-neutral-400">
-                      All objects assigned
-                    </div>
-                  )}
+                  {game!.objects.map((o) => {
+                    const assigned = findSlotByObjectId(o.id) !== null;
+
+                    return assigned ? (
+                      <StaticCard
+                        key={o.id}
+                        title={o.name}
+                        subtitle="Assigned"
+                      />
+                    ) : (
+                      <DraggableCard
+                        key={o.id}
+                        id={o.id}
+                        title={o.name}
+                        subtitle="Drag me"
+                      />
+                    );
+                  })}
                 </div>
 
                 <div className="mt-5 flex flex-wrap gap-2">
@@ -389,9 +461,10 @@ export default function DailyGame() {
             )}
           </DroppableWrapper>
 
-          {/* RIGHT: slots (metrics) */}
-          <div className="rounded-2xl border bg-white p-5 shadow-sm">
+          {/* RIGHT: Metrics */}
+          <div className="rounded-2xl border bg-white p-5 shadow-sm flex flex-col">
             <h3 className="text-base font-semibold">Metrics</h3>
+
             <div className="mt-3 space-y-3">
               {metrics.map((m) => {
                 const placed = assignment[m.key];
@@ -404,35 +477,23 @@ export default function DailyGame() {
                   <DroppableWrapper key={m.key} droppableId={m.key}>
                     {({ isOver }) => (
                       <DroppableSlot
-                        id={m.key}
                         title={m.label}
                         hint={m.hint}
                         isOver={isOver}
-                      >
-                        {placed ? (
-                          <div className="flex items-center justify-between gap-3">
-                            <DraggableCard
-                              id={placed}
-                              title={labelForObject(placed)}
-                              subtitle="Drag to move"
-                            />
-                            {checkMark === true && (
-                              <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700">
-                                OK
-                              </span>
-                            )}
-                            {checkMark === false && (
-                              <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-700">
-                                NO
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="text-sm text-neutral-400">
-                            Drop here
-                          </div>
-                        )}
-                      </DroppableSlot>
+                        checkMark={
+                          checkState.status === "done" ? checkMark : null
+                        }
+                        placed={
+                          placed ? (
+                            <div className="flex items-center gap-2">
+                              <DraggableCard
+                                id={placed}
+                                title={labelForObject(placed)}
+                              />
+                            </div>
+                          ) : undefined
+                        }
+                      />
                     )}
                   </DroppableWrapper>
                 );
@@ -441,11 +502,13 @@ export default function DailyGame() {
           </div>
         </div>
 
-        <DragOverlay>
+        {/* Overlay same size as original card => cursor matches click point */}
+        <DragOverlay modifiers={[snapCenterToCursor]}>
           {activeId ? (
-            <div className="rounded-xl border bg-white p-3 shadow-lg">
-              <div className="font-medium">{overlayTitle}</div>
-              <div className="mt-1 text-xs text-neutral-500">Dragging…</div>
+            <div className="select-none cursor-grabbing touch-none inline-flex items-center rounded-xl border bg-white px-3 py-2 shadow-lg">
+              <span className="max-w-[160px] truncate font-medium">
+                {overlayTitle}
+              </span>
             </div>
           ) : null}
         </DragOverlay>
