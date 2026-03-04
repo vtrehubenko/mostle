@@ -8,29 +8,28 @@ datasource db {
 }
 
 model DailyGame {
-  id            String   @id @default(cuid())
-  date          DateTime @unique
-  theme         String
-  specialLabel  String
-  specialHint   String
-  createdAt     DateTime @default(now())
+  id           String   @id @default(cuid())
+  dateKey      String   @unique
+  theme        String
+  specialLabel String
+  specialHint  String
+  createdAt    DateTime @default(now())
 
-  objects       GameObject[]
+  objects      GameObject[]
 }
 
 model GameObject {
-  id         String    @id @default(cuid())
-  name       String
+  id        String   @id @default(cuid())
+  name      String
+  oldest    Int
+  largest   Int
+  value     Int
+  influence Int
 
-  // metrics (numbers). We keep them as Int to simplify.
-  oldest     Int
-  largest    Int
-  value      Int
-  influence  Int
-  specialValue Int
+  employees Int
+  users     Int
+  marketCap Int
+  patents   Int
 
-  dailyGame   DailyGame @relation(fields: [dailyGameId], references: [id], onDelete: Cascade)
-  dailyGameId String
-
-  @@index([dailyGameId])
+  dailyGames DailyGame[]
 }

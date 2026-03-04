@@ -1,76 +1,72 @@
-import { prisma } from "../lib/prisma";
+import { PrismaClient } from "@prisma/client";
 
-function startOfToday() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
+const prisma = new PrismaClient();
 
 async function main() {
-  const today = startOfToday();
+  // на деве удобно чистить, чтобы сид был идемпотентным
+  await prisma.gameObject.deleteMany();
 
-  const existing = await prisma.dailyGame.findUnique({
-    where: { date: today },
-  });
-  if (existing) {
-    console.log("Seed skipped: today's game already exists.");
-    return;
-  }
-
-  await prisma.dailyGame.create({
-    data: {
-      date: today,
-      theme: "Tech Giants",
-      specialLabel: "Employees",
-      specialHint: "Company with the most employees",
-      objects: {
-        create: [
-          {
-            name: "Apple",
-            oldest: 1976,
-            largest: 220,
-            value: 3000,
-            influence: 95,
-            specialValue: 164000,
-          },
-          {
-            name: "Microsoft",
-            oldest: 1975,
-            largest: 230,
-            value: 2800,
-            influence: 92,
-            specialValue: 221000,
-          },
-          {
-            name: "Google",
-            oldest: 1998,
-            largest: 180,
-            value: 1900,
-            influence: 98,
-            specialValue: 190000,
-          },
-          {
-            name: "Amazon",
-            oldest: 1994,
-            largest: 200,
-            value: 1600,
-            influence: 90,
-            specialValue: 1500000,
-          },
-          {
-            name: "Meta",
-            oldest: 2004,
-            largest: 120,
-            value: 900,
-            influence: 88,
-            specialValue: 67000,
-          },
-        ],
+  await prisma.gameObject.createMany({
+    data: [
+      {
+        name: "Apple",
+        oldest: 1976,
+        largest: 10,
+        value: 9,
+        influence: 10,
+        employees: 161000,
+        users: 2000,
+        marketCap: 3000,
+        patents: 50000,
       },
-    },
+      {
+        name: "Google",
+        oldest: 1998,
+        largest: 9,
+        value: 10,
+        influence: 10,
+        employees: 182000,
+        users: 3500,
+        marketCap: 2000,
+        patents: 60000,
+      },
+      {
+        name: "Microsoft",
+        oldest: 1975,
+        largest: 9,
+        value: 10,
+        influence: 10,
+        employees: 221000,
+        users: 1500,
+        marketCap: 2800,
+        patents: 70000,
+      },
+      {
+        name: "Amazon",
+        oldest: 1994,
+        largest: 10,
+        value: 9,
+        influence: 9,
+        employees: 1500000,
+        users: 300,
+        marketCap: 1600,
+        patents: 40000,
+      },
+      {
+        name: "Tesla",
+        oldest: 2003,
+        largest: 7,
+        value: 8,
+        influence: 9,
+        employees: 140000,
+        users: 50,
+        marketCap: 600,
+        patents: 20000,
+      },
+    ],
   });
 
-  console.log("Seeded: daily game created.");
+  console.log("✅ Seeded GameObject");
 }
 
 main()

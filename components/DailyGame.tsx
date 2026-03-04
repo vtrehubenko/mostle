@@ -33,6 +33,14 @@ const EMPTY_ASSIGNMENT: Assignment = {
   specialValue: null,
 };
 
+const METRICS_ORDER: MetricKey[] = [
+  "oldest",
+  "largest",
+  "value",
+  "influence",
+  "specialValue",
+];
+
 const DROPPABLE_POOL_ID = "pool";
 
 function DraggableCard({
@@ -233,18 +241,23 @@ export default function DailyGame() {
 
   async function onCheck() {
     setCheckState({ status: "checking" });
+
     try {
+      const userOrder = METRICS_ORDER.map((k) => assignment[k] ?? "");
+
       const res = await fetch("/api/check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assignment }),
+        body: JSON.stringify({ userOrder }),
       });
+
       if (!res.ok) throw new Error(await res.text());
+
       const data = (await res.json()) as {
         allCorrect: boolean;
         result: Array<{ key: MetricKey; isCorrect: boolean }>;
       };
-      console.log("CHECK RESULT:", data);
+
       setCheckState({
         status: "done",
         allCorrect: data.allCorrect,
@@ -414,6 +427,38 @@ export default function DailyGame() {
                 </div>
 
                 <div className="mt-5 flex flex-wrap gap-2">
+                  {process.env.NODE_ENV === "development" && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          const res = await fetch("/api/dev/generate", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ baseDateKey: game!.date }),
+                          });
+                          if (!res.ok) throw new Error(await res.text());
+                          const data = (await res.json()) as DailyGameDTO;
+
+                          setState({ status: "success", data });
+                          setAssignment(EMPTY_ASSIGNMENT);
+                          setCheckState({ status: "idle" });
+                        } catch (e) {
+                          const message =
+                            e instanceof Error ? e.message : "Unknown error";
+                          setState({ status: "error", message });
+                        }
+                      }}
+                      style={{
+                        marginLeft: 8,
+                        background: "#eee",
+                        border: "1px solid #ccc",
+                        padding: "6px 12px",
+                        borderRadius: 6,
+                      }}
+                    >
+                      Generate new day (dev)
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={resetAll}
@@ -501,8 +546,6 @@ export default function DailyGame() {
             </div>
           </div>
         </div>
-
-        {/* Overlay same size as original card => cursor matches click point */}
         <DragOverlay modifiers={[snapCenterToCursor]}>
           {activeId ? (
             <div className="select-none cursor-grabbing touch-none inline-flex items-center rounded-xl border bg-white px-3 py-2 shadow-lg">
